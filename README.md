@@ -9,24 +9,56 @@ For now: see `database/schema_postgres.sql` to provision the database
 and `src/main/resources/database.properties.example` for connection setup.
 
 
+## Class diagram
+
 ```mermaid
 classDiagram
-    direction TB
+    direction LR
 
-    %% ============ MODEL ============
+    %% =========== ENUMS ===========
+    class UserRole {
+        <<enumeration>>
+        ADMIN
+        RECEPTIONIST
+    }
+    class RoomType {
+        <<enumeration>>
+        SINGLE
+        DOUBLE
+        SUITE
+    }
+    class RoomStatus {
+        <<enumeration>>
+        AVAILABLE
+        OCCUPIED
+        MAINTENANCE
+    }
+    class ReservationStatus {
+        <<enumeration>>
+        PENDING
+        ACTIVE
+        COMPLETED
+        CANCELLED
+    }
+
+    %% =========== ENTITIES ===========
     class User {
         -int id
         -String username
         -String passwordHash
         -UserRole role
         -String fullName
+        -String email
         -boolean active
+        -LocalDateTime createdAt
     }
     class Guest {
         -int id
         -String documentNumber
         -String firstName
         -String lastName
+        -String phone
+        -String email
         -boolean active
         +getFullName() String
     }
@@ -49,7 +81,7 @@ classDiagram
         +nights() long
     }
 
-    %% ============ DAO ============
+    %% =========== DAO INTERFACES ===========
     class GenericDao~T,ID~ {
         <<interface>>
         +save(T) T
@@ -70,19 +102,20 @@ classDiagram
         <<interface>>
         +findByRoomNumber(String) Optional~Room~
         +findAvailable() List~Room~
-        +updateStatus(...) boolean
+        +updateStatus(int, RoomStatus) boolean
     }
     class ReservationDao {
         <<interface>>
-        +countOverlapping(...) int
+        +countOverlapping(int, LocalDate, LocalDate) int
         +findByGuestId(int) List~Reservation~
+        +findByStatus(ReservationStatus) List~Reservation~
         +save(Connection, Reservation) Reservation
     }
 
-    %% ============ SERVICE ============
+    %% =========== SERVICES ===========
     class AuthService {
         -UserDao userDao
-        +login(username, password) User
+        +login(String, String) User
     }
     class RoomService {
         -RoomDao roomDao
@@ -93,60 +126,95 @@ classDiagram
         -GuestDao guestDao
         +createGuest(Guest) Guest
         +deactivate(int) boolean
+        +activate(int) boolean
     }
     class ReservationService {
         -ReservationDao reservationDao
         -RoomDao roomDao
         -GuestDao guestDao
+        -BigDecimal iva
         +createReservation(...) Reservation
         +checkIn(int) void
         +checkOut(int) void
+        +cancel(int) boolean
     }
 
-    %% ============ VIEW ============
+    %% =========== VIEWS ===========
     class View {
         <<interface>>
         +showMessage(String) void
         +askString(String) String
-        +showMenu(...) int
+        +askPassword(String) String
+        +showMenu(String, String[]) int
+    }
+    class BaseView {
+        <<abstract>>
+        #formatUser(User) String
+        #formatRoom(Room) String
+        #formatGuest(Guest) String
+        #formatReservation(Reservation) String
     }
     class ConsoleView
     class JOptionPaneView
 
-    %% ============ EXCEPTIONS ============
-    class BusinessException
+    %% =========== EXCEPTIONS ===========
+    class BusinessException {
+        +BusinessException(String)
+    }
     class DuplicateRoomNumberException
     class RoomNotAvailableException
     class InactiveGuestException
+    class InvalidDateRangeException
     class OverlappingReservationException
     class CheckoutWithoutCheckinException
-    class InvalidDateRangeException
+    class AuthenticationException
+    class EntityNotFoundException
 
-    %% ============ INHERITANCE ============
+    %% =========== INHERITANCE ===========
     GenericDao <|-- UserDao
     GenericDao <|-- GuestDao
     GenericDao <|-- RoomDao
     GenericDao <|-- ReservationDao
 
-    View <|.. ConsoleView
-    View <|.. JOptionPaneView
+    View <|.. BaseView
+    BaseView <|-- ConsoleView
+    BaseView <|-- JOptionPaneView
 
     BusinessException <|-- DuplicateRoomNumberException
     BusinessException <|-- RoomNotAvailableException
     BusinessException <|-- InactiveGuestException
+    BusinessException <|-- InvalidDateRangeException
     BusinessException <|-- OverlappingReservationException
     BusinessException <|-- CheckoutWithoutCheckinException
-    BusinessException <|-- InvalidDateRangeException
+    BusinessException <|-- AuthenticationException
+    BusinessException <|-- EntityNotFoundException
 
-    %% ============ DEPENDENCIES ============
-    AuthService --> UserDao
-    RoomService --> RoomDao
-    GuestService --> GuestDao
-    ReservationService --> ReservationDao
-    ReservationService --> RoomDao
-    ReservationService --> GuestDao
+    %% =========== COMPOSITION (services own their DAOs) ===========
+    AuthService *-- UserDao
+    RoomService *-- RoomDao
+    GuestService *-- GuestDao
+    ReservationService *-- ReservationDao
+    ReservationService *-- RoomDao
+    ReservationService *-- GuestDao
 
-    Reservation --> Guest : guestId
-    Reservation --> Room : roomId
-    Reservation --> User : userId
+    %% =========== ASSOCIATIONS (entity relationships) ===========
+    Reservation "0..*" --> "1" Guest : guest
+    Reservation "0..*" --> "1" Room : room
+    Reservation "0..*" --> "1" User : createdBy
+
+    %% =========== DEPENDENCIES (use enums) ===========
+    User ..> UserRole
+    Room ..> RoomType
+    Room ..> RoomStatus
+    Reservation ..> ReservationStatus
+
+    %% =========== SERVICES THROW EXCEPTIONS ===========
+    RoomService ..> DuplicateRoomNumberException : throws
+    GuestService ..> EntityNotFoundException : throws
+    ReservationService ..> RoomNotAvailableException : throws
+    ReservationService ..> InactiveGuestException : throws
+    ReservationService ..> OverlappingReservationException : throws
+    ReservationService ..> CheckoutWithoutCheckinException : throws
+    ReservationService ..> InvalidDateRangeException : throws
+    AuthService ..> AuthenticationException : throws
 ```
