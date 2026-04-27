@@ -1,11 +1,6 @@
 # ============================================================================
 # Database connection - PostgreSQL on Neon
 # ============================================================================
-# This is the EXAMPLE file. Copy it to "database.properties" (without the
-# .example suffix) and replace the values with your real Neon credentials.
-#
-# database.properties is git-ignored so credentials never reach GitHub.
-# ============================================================================
 
 # JDBC URL must start with jdbc:postgresql://
 # In Neon, click "Connection Details" and copy the connection string,

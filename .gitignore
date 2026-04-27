@@ -1,8 +1,17 @@
 target/
+
 .idea/
 *.iml
+*.ipr
 *.iws
+out/
+*.class
+*.jar
+!**/lib/*.jar
 src/main/resources/database.properties
 *.log
-logs/
+*.log.*
 
+# Generated CSV reports
+reports/
+*.csv
